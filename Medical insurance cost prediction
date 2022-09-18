@@ -1,0 +1,258 @@
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+
+warnings.filterwarnings("ignore")
+
+df = pd.read_csv('/kaggle/input/insurance/insurance.csv')
+df.info()
+df.describe()
+{col:list(df[col].unique()) for col in df.select_dtypes("object")}
+def pie(feature,title,explode,colors):
+    
+    serie = feature.value_counts()
+
+
+    serie.plot(kind='pie',title=title, figsize=[20,8],
+                     colors=colors,explode=explode,
+          autopct=lambda p: '{:.2f}%({:.0f})'.format(p,(p/100)*serie.sum()))
+colors=['#77dd77','#fdfd96','#84b6f4','#fdcae1']
+explode= [0,0,0.1,0]
+_ = pie(df.region,'Region',explode,colors)
+
+colors=['#77dd77','#ff6961']
+explode=[0.1,0.01]
+
+_ = pie(df.smoker,'Smoker',explode,colors)
+
+explode=[0,0]
+colors=['#FFD1DC','#2271b3']
+
+_ = pie(df.sex,'Sex',explode,colors)
+
+explode=[0.04,0,0,0,0,0]
+colors=['#b0f2c2','#fdfd96','#84b6f4','#fdcae1','#b0c2f2','#77dd77']
+
+_ = pie(df.children,'Children',explode,colors)
+
+sns.set_style(style="whitegrid")
+
+
+def histogram(feature,title):
+
+
+  fig,ax=plt.subplots(1,1,figsize=(20,8))
+
+  ax.set_title(title)
+  ax.hist(df[feature],ec="k",color="#FADA5E",lw=3)
+
+
+  ax.axvline(df[feature].mean(),
+           color="red",
+           linestyle="--",
+           lw=3,label="Mean")
+
+
+  ax.axvline(df[feature].median(),
+           color="blue",
+           linestyle="--",
+           lw=3,label="Median")
+
+  ax.legend()
+
+  plt.show()
+
+_ = histogram("charges","Charges")
+
+fig = plt.subplots(1,1,figsize = (20,8))
+_ = sns.boxplot(data = df,x = "smoker",y = "charges",palette="cool")
+
+df.groupby("smoker")["charges"].mean()
+
+
+_ = histogram("bmi","BMI")
+
+
+fig = plt.subplots(1,1,figsize = (20,8))
+_ = sns.scatterplot(data = df,x = "bmi",y = "charges",hue = "smoker")
+
+_ = histogram('age','Age')
+
+fig = plt.subplots(1,1,figsize = (20,8))
+_ = sns.scatterplot(data = df,x = "age",y = "charges",hue = "smoker")
+
+fig,ax= plt.subplots(1,1,figsize = (20,8))
+
+_ = ax.set_title("Correlation Matrix")
+_ = sns.heatmap(df.corr(),annot=True,fmt="g",cmap="Greens")
+
+
+
+class Intervals():
+    
+    def __init__(self,feature):
+        
+        
+        self.mean=feature.mean()
+        self.sd=feature.std()
+        self.interval_range=[1.5,2,2.5,3.0,3.5,4]
+        
+    def Upper_Interval(self):
+        
+        for interval in self.interval_range:
+            
+            upper_interval= self.mean+interval*self.sd
+            upper_interval = np.round(upper_interval,2)
+            
+            print(f"Interval range {interval}: {upper_interval}")
+        
+    def Lower_Interval(self):
+        
+         for interval in self.interval_range:
+            
+            lower_interval = self.mean-interval*self.sd
+            lower_interval = np.round(lower_interval)
+            
+            print(f"Interval range {interval}: {lower_interval}")
+
+
+class Best_Interval(Intervals):
+    
+    def __init__(self,feature):
+        Intervals.__init__(self,feature)
+
+
+
+Best_Interval(df.bmi).Upper_Interval()
+
+
+df.bmi = np.where(df.bmi > 48.96,48.96,df.bmi)
+
+_ = histogram("bmi","BMI")
+
+smoker_no_split = df.query("smoker == 'no'")
+smoker_yes_split = df.query("smoker == 'yes'")
+
+fig = plt.subplots(1,1,figsize = (20,8))
+_ = sns.scatterplot(data = smoker_no_split,x = "age",y = "charges")
+
+Best_Interval(smoker_no_split.charges).Upper_Interval()
+
+smoker_no_split['medical_problem'] = smoker_no_split["charges"].apply(lambda x: "severe" if x>17000 else "light")
+
+fig = plt.subplots(1,1,figsize = (20,8))
+_ = sns.scatterplot(data = smoker_yes_split,x = "age",y = "charges")
+
+Best_Interval(smoker_yes_split.charges).Upper_Interval()
+
+smoker_yes_split["medical_problem"]=smoker_yes_split["charges"].apply(lambda x: "severe" if x > 32000 else "light")
+
+smoker_yes_split["charges"]=smoker_yes_split["charges"].apply(lambda x: 48000 if x > 48000 else x)
+
+df_clear = pd.concat([smoker_no_split,smoker_yes_split])
+
+
+def boxplot():
+    
+
+    fig,(ax_box_1,ax_box_2)=plt.subplots(1,2,figsize=(20,8))
+    
+    ax_box_1.set_title("Adding new feature")
+
+    sns.boxplot(data=df_clear,x="smoker",
+            y="charges",
+            hue="medical_problem",
+            palette="Set2",
+            ax=ax_box_1)
+
+    ax_box_2.set_title("Without the new feature")
+    sns.boxplot(data=df,
+            x="smoker",
+            y="charges",
+            palette="Set2",
+            ax=ax_box_2)
+    
+    
+    plt.show()
+
+
+
+_ = boxplot()
+
+def ohe():
+    return pd.get_dummies(df_clear.region)
+
+
+def concatene_df():
+    
+    region_ohe = ohe()
+    
+    return pd.concat([region_ohe,df_clear.age,df_clear.sex,df_clear.children,df_clear.bmi,df_clear.medical_problem,df_clear.smoker,df_clear.charges],axis = "columns")
+
+df_clear_ohe  = concatene_df()
+
+df_clear_ohe.head()
+
+
+df_clear_ohe['medical_problem'] = np.where(df_clear_ohe.medical_problem == 'severe',1,0)
+df_clear_ohe['sex'] = np.where(df_clear_ohe.sex == 'male',1,0)
+df_clear_ohe['smoker'] = np.where(df_clear_ohe.smoker == 'yes',1,0)
+X,y = df_clear_ohe.drop(columns=["charges"]),df_clear_ohe.charges
+
+
+#Splitting data
+
+from sklearn.model_selection import train_test_split
+X_train,X_test,Y_train,Y_test=train_test_split(X,
+                                               y,
+                                               test_size=0.33,
+                                               random_state=42)
+#linear regression
+
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import GridSearchCV
+
+grid = GridSearchCV(LinearRegression(),{'normalize':[True,False]},cv = 5)
+grid.fit(X_train,Y_train)
+grid.best_params_
+lm = LinearRegression()
+lm.fit(X_train,Y_train)
+
+#R2
+
+lm.score(X_train,Y_train)    #0.9716312349142799
+lm.score(X_test,Y_test)      #0.9739010615710931
+
+###They have a good coefficient of determination for both data sets.
+
+
+from sklearn.metrics import mean_squared_error
+def MSE(model):
+    
+    pred_train = model.predict(X_train)
+    pred_test = model.predict(X_test)
+    
+    mse_train = mean_squared_error(Y_train,pred_train)
+    mse_test = mean_squared_error(Y_test,pred_test)
+    
+    
+    return mse_train,mse_test
+mse_train,mse_test = MSE(lm)
+
+print(f"MSE Train: {mse_train}")  # MSE Train: 3962161.973900936
+print(f"MSE Test:  {mse_test}")   # MSE Test:  3833987.9845872098
+
+#They have an MSE comparable to each other, which indicates that the model does not suffer from the much feared effect of overfitting.
+
+
+
